@@ -1,2 +1,2 @@
 # ZPD_Kristaps_Bukss
-Izmantotie/svarīgie faili zpd izveidē
+Izmantotie/svarīgie faili zpd izveidei
