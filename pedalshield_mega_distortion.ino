@@ -11,6 +11,8 @@ U8GLIB_SH1106_128X64 u8g(U8G_I2C_OPT_NO_ACK);  // Display which does not send AC
 #define TOGGLE 2
 #define PUSHBUTTON_1 A5
 #define PUSHBUTTON_2 A4
+#define ADJUSTMENT_STEP 500
+#define DEBOUNCE_TIME 100
 
 //defining the output PWM parameters
 #define PWM_FREQ 0x00FF // pwm frequency - 31.3KHz
@@ -18,7 +20,8 @@ U8GLIB_SH1106_128X64 u8g(U8G_I2C_OPT_NO_ACK);  // Display which does not send AC
 #define PWM_QTY 2 // 2 PWMs in parallel
 
 //other variables
-int input, distortion_threshold=6000; //initial value adjusted by try and error.
+uint32_t last_button_press = 0;
+int input, distortion_threshold=10000; //initial value adjusted by try and error.
 int counter=0;
 unsigned int ADC_low, ADC_high;
 
@@ -62,6 +65,7 @@ void loop()
    u8g.setPrintPos(30, 64); 
    u8g.setFont(u8g_font_helvR18r); 
    u8g.print(distortion_threshold);
+   
   } while( u8g.nextPage() );
   }
     else  
@@ -87,14 +91,18 @@ counter++; //to save resources, the pushbuttons are checked every 1000 times.
 if(counter==1000)
 { 
 counter=0;
-if (!digitalRead(PUSHBUTTON_2)) {
-  if (distortion_threshold<32768)distortion_threshold=distortion_threshold+25; //increase the vol
+if (!digitalRead(PUSHBUTTON_2) && millis() > last_button_press + DEBOUNCE_TIME) {
+  if (distortion_threshold<INT16_MAX - ADJUSTMENT_STEP - 1)
+    distortion_threshold+=ADJUSTMENT_STEP; //increase the vol
     digitalWrite(LED, LOW); //blinks the led
+    last_button_press = millis();
     }
 
-    if (!digitalRead(PUSHBUTTON_1)) {
-  if (distortion_threshold>0)distortion_threshold=distortion_threshold-25; //decrease vol
-  digitalWrite(LED, LOW); //blinks the led
+    if (!digitalRead(PUSHBUTTON_1) && millis() > last_button_press + DEBOUNCE_TIME) {
+  if (distortion_threshold>=ADJUSTMENT_STEP)
+    distortion_threshold-=ADJUSTMENT_STEP; //decrease vol
+    digitalWrite(LED, LOW); //blinks the led
+    last_button_press = millis();
     }
 }
 
@@ -102,7 +110,7 @@ if (!digitalRead(PUSHBUTTON_2)) {
   //the value is clipped to the distortion_threshold value
     if(input>distortion_threshold) input=distortion_threshold;
     else if(input<-distortion_threshold) input=-distortion_threshold;
-
+  
   //write the PWM signal
   OCR4AL = ((input + 0x8000) >> 8); // convert to unsigned, send out high byte
   OCR4BL = input; // send out low byte
